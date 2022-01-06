@@ -1,3 +1,7 @@
+set_global_assignment -name VERILOG_FILE rtl/composite_pal.v
+set_global_assignment -name VERILOG_FILE rtl/GEN/jt12/jt12_op_hd.v
+set_global_assignment -name VERILOG_FILE rtl/GEN/jt12/jt12_logsin_hd.v
+set_global_assignment -name VERILOG_FILE rtl/GEN/jt12/jt12_exprom_hd.v
 set_global_assignment -name QIP_FILE rtl/FX68K/fx68k.qip
 set_global_assignment -name QIP_FILE rtl/GEN/GEN.qip
 set_global_assignment -name QIP_FILE rtl/MCD/MCD.qip

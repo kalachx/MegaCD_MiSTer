@@ -253,13 +253,22 @@ pll pll
 // 0         1         2         3          4         5         6   
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXX  XXXXXXXXXXXXXXXXX XXX XXXXXXXXXXXXXXXXXXXXXXXXX
+// XXXXXXXXX  XXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXXXXXXXXX XX
 
 `include "build_id.v"
 localparam CONF_STR = {
 	"MegaCD;;",
 	"S0,CUE,Insert Disk;",
 	"-;",
+	//"OQ,Blast Processing,Original,True;", // not implemented here yet, status 28
+	"oS,FM Overdrive,No,Yes;", //changed from 56 to 60
+	"oPQ,- Sine LUT,Default,SineExp/3,Clean512,Linear512;",
+	"oR,  Extra Boost,No,Yes;",
+	//"O9,  Exponent,Default,ExpSine;",
+	"oT,  Feedback Gain,Default,Reduced;",
+	"oUV,Color Palette,Default,Raw RGB,Composite,Grayscale;",
+	"-;",
+
 	"h6O67,Region,Auto(JP),JP,US,EU;",
 	"h7O67,Region,Auto(US),JP,US,EU;",
 	"h8O67,Region,Auto(EU),JP,US,EU;",
@@ -327,6 +336,19 @@ localparam CONF_STR = {
 	"V,v",`BUILD_DATE
 };
 
+wire fm_overdrive;
+wire [1:0] fmo_sinelut;
+wire fmo_extra;
+//wire fmo_exprom;
+wire fmo_gain;
+wire [1:0] use_color_lut;
+
+assign fm_overdrive = status[60];
+assign fmo_sinelut = status[58:57];
+assign fmo_extra = status[59];
+//assign fmo_exprom = status[9];
+assign fmo_gain = status[61];
+assign use_color_lut = status[63:62];
 
 wire [15:0] status_menumask = {en216p,region,!region,~gg_available,!gun_mode,1'b1,~dbg_menu,1'b0,~bk_ena};
 wire [63:0] status;
@@ -501,12 +523,42 @@ wire        GEN_MEM_BUSY;
 wire [15:0] GEN_AUDL;
 wire [15:0] GEN_AUDR;
 
+wire [7:0] lut_r, lut_g, lut_b;
+logic [23:0] pal_color;
+reg [9:0] r1, r2, g1, g2, b1, b2, luma;
+logic [7:0] r_comp, b_comp, g_comp;
+assign {r_comp, g_comp, b_comp} = (use_color_lut == 2'b10) ? pal_color : {luma[9:2], luma[9:2], luma[9:2]};
+
+// LUT used for Composite palette
+composite_pal palette_comp (
+	.clk(clk_sys),
+	.index({r,g,b}),
+	.out(pal_color)
+);
+
+// LUT for Default and Grayscale color palettes
 wire [7:0] color_lut[16] = '{
 	8'd0,   8'd27,  8'd49,  8'd71,
 	8'd87,  8'd103, 8'd119, 8'd130,
 	8'd146, 8'd157, 8'd174, 8'd190,
 	8'd206, 8'd228, 8'd255, 8'd255
 };
+
+// Generate Luma for Grayscale palette
+always @(posedge clk_sys) begin
+	r1 <= {2'd0, color_lut[r][7:0]};
+	r2 <= {5'd0, color_lut[r][7:3]};
+	g1 <= {1'd0, color_lut[g], color_lut[g][7]};
+	g2 <= {4'd0, color_lut[g][7:2]};
+	b1 <= {4'd0, color_lut[b][7:2]};
+	b2 <= {5'd0, color_lut[b][7:3]};
+	luma <= r1 + r2 + g1 + g2 + b1 + b2;
+end
+
+// Assign colors depending on use_color_lut value
+assign lut_r = use_color_lut[1] ? r_comp : (use_color_lut[0] ? {r, r} : color_lut[r]);
+assign lut_g = use_color_lut[1] ? g_comp : (use_color_lut[0] ? {g, g} : color_lut[g]);
+assign lut_b = use_color_lut[1] ? b_comp : (use_color_lut[0] ? {b, b} : color_lut[b]);
 
 wire [3:0] r, g, b;
 wire vs,hs;
@@ -565,6 +617,8 @@ gen gen
 	.DAC_LDATA(GEN_AUDL),
 	.DAC_RDATA(GEN_AUDR),
 
+	.TURBO({status[26], 1'b0}), // Medium turbo is unstable
+
 	.RED(r),
 	.GREEN(g),
 	.BLUE(b),
@@ -609,6 +663,11 @@ gen gen
 	.ENABLE_PSG(EN_GEN_PSG),
 	.EN_HIFI_PCM(status[23]), // Option "N"
 	.LADDER(~status[8]),
+	.FM_OVERDRIVE(fm_overdrive),
+	.FMO_SINELUT(fmo_sinelut),
+	.FMO_EXTRA(fmo_extra),
+	.FMO_EXPROM(1'b0),
+	.FMO_GAIN(fmo_gain),
 	.LPF_MODE(status[15:14]),
 
 	.OBJ_LIMIT_HIGH(status[31]),
@@ -1047,9 +1106,9 @@ cofi coffee (
 	.vblank(vblank),
 	.hs(hs),
 	.vs(vs),
-	.red(color_lut[r]),
-	.green(color_lut[g]),
-	.blue(color_lut[b]),
+	.red(lut_r),
+	.green(lut_g),
+	.blue(lut_b),
 
 	.hblank_out(hblank_c),
 	.vblank_out(vblank_c),

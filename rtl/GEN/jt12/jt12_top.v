@@ -38,6 +38,12 @@ module jt12_top (
     output          irq_n,
     // Configuration
     input           en_hifi_pcm,  // high to enable PCM interpolation on YM2612 mode
+    input           fm_overdrive, // high to enable high precission FM operator
+    input   [1:0]   fmo_sinelut,  // used to change FM Overdrive sound
+    input           fmo_extra,    // used to enhance FM Overdrive effect
+    input           fmo_exprom,   // used to change FM Overdrive sound
+    input           fmo_gain,     // high to enable alternate gain (less distortion - inauthentic sound)
+    
     // ADPCM pins
     output  [19:0]  adpcma_addr,  // real hardware has 10 pins multiplexed through RMPX pin
     output  [ 3:0]  adpcma_bank,
@@ -468,8 +474,9 @@ endgenerate
     assign psg_dout = 8'd0;
 `endif
 
-wire    [ 8:0]  op_result;
-wire    [13:0]  op_result_hd;
+wire    [ 8:0]  op_result, op_result_normal, op_result_fmo;
+wire    [13:0]  op_result_hd, op_result_hd_normal, op_result_real_fmo;
+
 `ifndef NOFM
 /* verilator tracing_off */
 jt12_pg #(.num_ch(num_ch)) u_pg(
@@ -551,13 +558,44 @@ jt12_op #(.num_ch(num_ch)) u_op(
     .yuse_prev1     ( yuse_prev1    ),
     .yuse_prev2     ( yuse_prev2    ),
     .zero           ( zero          ),
-    .op_result      ( op_result     ),
-    .full_result    ( op_result_hd  )
+    .op_result      ( op_result_normal    ),
+    .full_result    ( op_result_hd_normal )
 );
 `else 
 assign op_result    = 'd0;
 assign op_result_hd = 'd0;
 `endif
+
+jt12_op_hd #(.num_ch(num_ch)) u_op_hd(
+    .rst            ( rst           ),
+    .clk            ( clk           ),
+    .clk_en         ( clk_en        ),
+    .fmo_sinelut    ( fmo_sinelut   ),
+    .fmo_extra      ( fmo_extra     ),
+    .fmo_exprom     ( fmo_exprom    ),
+    .fmo_gain       ( fmo_gain      ),
+    .pg_phase_VIII  ( phase_VIII    ),
+    .eg_atten_IX    ( eg_IX         ),
+    .fb_II          ( fb_II         ),
+
+    .test_214       ( 1'b0          ),
+    .s1_enters      ( s1_enters     ),
+    .s2_enters      ( s2_enters     ),
+    .s3_enters      ( s3_enters     ),
+    .s4_enters      ( s4_enters     ),
+    .xuse_prevprev1 ( xuse_prevprev1),
+    .xuse_internal  ( xuse_internal ),
+    .yuse_internal  ( yuse_internal ),
+    .xuse_prev2     ( xuse_prev2    ),
+    .yuse_prev1     ( yuse_prev1    ),
+    .yuse_prev2     ( yuse_prev2    ),
+    .zero           ( zero          ),
+    .op_result      ( op_result_fmo     ),
+    .full_result    ( op_result_hd_fmo  )
+);
+
+assign op_result = fm_overdrive ? op_result_fmo : op_result_normal;
+assign op_result_hd = fm_overdrive ? op_result_hd_fmo : op_result_hd_normal;
 
 /* verilator tracing_on */
 genvar i;

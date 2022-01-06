@@ -78,6 +78,11 @@ module gen
 
 	input         EN_HIFI_PCM,
 	input         LADDER,
+	input         FM_OVERDRIVE,
+	input  [1:0]  FMO_SINELUT,
+	input         FMO_EXTRA,
+	input         FMO_EXPROM,
+	input         FMO_GAIN,
 	input         OBJ_LIMIT_HIGH,
 
 	output  [3:0] RED,
@@ -133,6 +138,8 @@ module gen
 	input         GG_EN,
 	input [128:0] GG_CODE,
 	output        GG_AVAILABLE,
+    
+	input   [1:0] TURBO,
 
 	output [23:0] DBG_M68K_A,
 	output [23:0] DBG_MBUS_A
@@ -1163,6 +1170,11 @@ jt12 fm
 	.dout(FM_DO),
 	.en_hifi_pcm( EN_HIFI_PCM ),
 	.ladder(LADDER),
+	.fm_overdrive(FM_OVERDRIVE),
+	.fmo_sinelut(FMO_SINELUT),
+	.fmo_extra(FMO_EXTRA),
+	.fmo_exprom(FMO_EXPROM),
+	.fmo_gain(FMO_GAIN),
 	.snd_left(FM_left),
 	.snd_right(FM_right)
 );
